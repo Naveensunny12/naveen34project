@@ -1,0 +1,42 @@
+#!/bin/bash
+
+#def app = env.app_type
+aws eks update-kubeconfig --name $CONTEXT --region us-east-2
+kubectl config set-context --current --namespace=wcs
+#kubectl config use-context
+
+# Define namespace, app label, and container name
+APP_LABEL="auth"
+CONTAINER_NAME="crs-app"
+
+Kubectl get pods -A | grep ebootsprdlive | grep ${app_type} | grep -v Completed
+
+# Step 1: Login to the container
+POD_INFO=$(kubectl get pods -n $NAMESPACE -l app=$APP_LABEL -l name=$CONTAINER_NAME -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -it $POD_INFO -n $NAMESPACE -c $CONTAINER_NAME -- bash <<EOF
+
+case ${app_type} in 
+ts-app) 
+	echo ts-app
+    LOG_PATH='/opt/WebSphere/Liberty/usr/servers/default/logs/container/store_ebootsqaauthcrs-app-564754b5c7-92z8s'
+	;; 
+
+# Step 2: Clear logs
+LOG_DIR="/opt/WebSphere/Liberty/usr/servers/default/logs/container/store_${pod_type} -564754b5c7-92z8s"
+cd $LOG_DIR
+date > trace.log
+date > messages.log
+
+# Step 3: Set trace specification
+run set-trace-specification '*=info:com.ibm.commerce.component.*=all:com.ibm.commerce.store.foundation.*=all'
+
+# Step 4: Reproduce the issue (manual step)
+
+# Step 5: Collect logs
+tar -czf $LOG_DIR.qa_auth.tgz $LOG_DIR
+EOF
+
+# Step 5: Copy logs out of the pod
+kubectl cp -n $NAMESPACE $POD_INFO:/opt/WebSphere/Liberty/usr/servers/default/logs/container/$LOG_DIR.qa_auth.tgz ./
+
+echo "Logs collected and saved to ./$LOG_DIR.qa_auth.tgz"
